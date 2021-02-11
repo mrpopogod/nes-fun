@@ -1,2 +1,4 @@
 *.bin
 *.nes
+debug.txt
+debugcode.txt

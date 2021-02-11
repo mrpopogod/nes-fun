@@ -4,6 +4,8 @@
   .setting "NESVerticalMirroring", true
   .setting "ShowLabelsAfterCompiling", true
   .setting "ShowLocalLabelsAfterCompiling", true
+  .setting "LaunchCommand", "c:\\emulation\\fceux.exe {0}"
+  .setting "DebugCommand", "c:\\emulation\\fceux.exe {0}"
 
 ;;;;;;;;;;;;;;;
 
@@ -90,7 +92,7 @@ Forever:
   
 ;;;;;;;;;;;;;;;;;
 
-NMI:
+NMIHandler:
   LDA #$00
   STA $2003       ; set the low byte (00) of the RAM address - OAMADDR
   LDA #$02
@@ -165,7 +167,7 @@ sprites:
   .b $88, $35, $00, $88   ;sprite 3
 
   .org $FFFA     ;first of the three vectors starts here
-  .dw NMI        ;when an NMI happens (once per frame if enabled) the 
+  .dw NMIHandler ;when an NMI happens (once per frame if enabled) the 
                    ;processor will jump to the label NMI:
   .dw RESET      ;when the processor first turns on or is reset, it will jump
                    ;to the label RESET:
