@@ -58,7 +58,7 @@ NMI:
  
 ;;;;;;;;;;;;;;  
   
-  .segment "VECTORS"
+  .segment "SETUP"
   .org $FFFA     ;first of the three vectors starts here
   .dw NMI        ;when an NMI happens (once per frame if enabled) the 
                    ;processor will jump to the label NMI:
