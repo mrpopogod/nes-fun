@@ -98,7 +98,7 @@ LoadBackgroundLoop:
   LDA background, x     ; load data from address (background + the value in x)
   STA $2007             ; write to PPU
   INX                   ; X = X + 1
-  CPX #$C0              ; Need to loop enough times to copy all bytes.  Each row is 32 bytes, we're doing 5 rows
+  CPX #$C0              ; Need to loop enough times to copy all bytes.  Each row is 32 bytes, we're doing 6 rows
   BNE LoadBackgroundLoop  ; Branch to LoadBackgroundLoop if compare was Not Equal to zero
                         ; if compare was equal to 128, keep going down
               
@@ -192,7 +192,6 @@ ReadRightDone:
   ;;This is the PPU clean up section, so rendering the next frame starts properly.
   ;;Before the end of vblank we need to set the scroll position - if we don't do this
   ;;in time we get fun bugs
-  ;LDA #$00         ; set the scroll position to be 0,0
   INY               ; horizontal auto scroll
   BNE ScrollCoords  ; did we scroll past the edge of the nametable?
   TXA

@@ -1,5 +1,6 @@
 *.bin
 *.nes
 *.deb
+*.cdl
 debug.txt
 debugcode.txt
