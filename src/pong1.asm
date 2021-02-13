@@ -29,6 +29,7 @@ buttons1   .ds 1  ; player 1 gamepad buttons, one bit per button
 buttons2   .ds 1  ; player 2 gamepad buttons, one bit per button
 score1     .ds 1  ; player 1 score, 0-15
 score2     .ds 1  ; player 2 score, 0-15
+respawntimer .ds 1  ; ticker to decrement until the ball respawns
 
 
 ;; DECLARE SOME CONSTANTS HERE
@@ -101,7 +102,7 @@ LoadPalettesLoop:
                           ; etc
   STA $2007             ; write to PPU
   INX                   ; X = X + 1
-  CPX #$20              ; Compare X to hex $10, decimal 16 - copying 16 bytes = 4 sprites
+  CPX #$20              ; Compare X to hex $20, copying 8 palettes (each is 4 bytes)
   BNE LoadPalettesLoop  ; Branch to LoadPalettesLoop if compare was Not Equal to zero
                         ; if compare was equal to 32, keep going down
 
@@ -138,7 +139,7 @@ LoadBackground3Loop:
 
     LDX #$00
 LoadBackground4Loop:
-  LDA background2, X
+  LDA background4, X
   STA $2007
   INX
   CPX #$80
@@ -146,7 +147,7 @@ LoadBackground4Loop:
 
   LDX #$00
 LoadBackground5Loop:
-  LDA background3, X
+  LDA background5, X
   STA $2007
   INX
   CPX #$80
@@ -154,7 +155,7 @@ LoadBackground5Loop:
 
  LDX #$00
 LoadBackground6Loop:
-  LDA background2, X
+  LDA background6, X
   STA $2007
   INX
   CPX #$80
@@ -162,7 +163,7 @@ LoadBackground6Loop:
 
 LDX #$00
 LoadBackground7Loop:
-  LDA background3, X
+  LDA background7, X
   STA $2007
   INX
   CPX #$A0                      ; last set has an extra row of tiles
@@ -209,9 +210,13 @@ LoadAttributeLoop:
   STA paddle1ytop
   STA paddle2ytop
 
+  LDA #$00
+  STA score1
+  STA score2
+
 
 ;;:Set starting game state
-  LDA #STATEPLAYING
+  LDA #STATEPLAYING   ; TODO: when implemented the title screen load that state instead
   STA gamestate
               
   LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
@@ -233,7 +238,9 @@ NMIHandler:
   LDA #$02
   STA $4014       ; set the high byte (02) of the RAM address, start the transfer
 
-  JSR DrawScore
+  JSR DrawScore    ; need to do this early so we're still in vblank
+                   ; TOdO: this section is all our background code, so we should have
+                   ; DrawTitle, DrawScore, DrawGameOver
 
   ;;This is the PPU clean up section, so rendering the next frame starts properly.
   LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
@@ -292,6 +299,8 @@ EngineGameOver:
 ;;;;;;;;;;;
  
 EnginePlaying:
+  LDA respawntimer
+  BNE GameEngineDone
 
 MoveBallRight:
   LDA ballright
@@ -305,12 +314,18 @@ MoveBallRight:
   LDA ballx
   CMP #RIGHTWALL
   BCC MoveBallRightDone      ;;if ball x < right wall, still on screen, skip next section
+
+  INC score1          ; player one scores a point
   LDA #$00
   STA ballright
   LDA #$01
-  STA ballleft         ;;bounce, ball now moving left
-  ; TODO
-  ;;in real game, give point to player 1, reset ball
+  STA ballleft         ; player 2 puts ball in play
+  LDA #$50
+  STA bally
+  LDA #$80
+  STA ballx            ; reset ball position
+  LDA #$30             ; respawn in 30 ticks
+  STA respawntimer
 MoveBallRightDone:
 
 
@@ -326,12 +341,18 @@ MoveBallLeft:
   LDA ballx
   CMP #LEFTWALL
   BCS MoveBallLeftDone      ;;if ball x > left wall, still on screen, skip next section
+
+  INC score2          ; player two scores a point
   LDA #$01
   STA ballright
   LDA #$00
-  STA ballleft         ;;bounce, ball now moving right
-  ; TODO
-  ;;in real game, give point to player 2, reset ball
+  STA ballleft         ; player 1 puts ball in play
+  LDA #$50
+  STA bally
+  LDA #$80
+  STA ballx            ; reset ball position
+  LDA #$30             ; respawn in 30 ticks
+  STA respawntimer
 MoveBallLeftDone:
 
 
@@ -478,22 +499,42 @@ CheckPaddle2Collision:
   STA ballleft         ;;bounce, ball now moving left
 CheckPaddle2CollisionDone:
 
+CheckEndOfGame:
+  LDA score1
+  CMP #$0F
+  BEQ MoveToEndState
+  LDA score2
+  CMP #$0F
+  BEQ MoveToEndState
+  JMP CheckEndOfGameDone
+
+MoveToEndState:
+  LDA #STATEGAMEOVER
+  STA gamestate
+CheckEndOfGameDone:
   JMP GameEngineDone
  
  
 UpdateSprites:
+  LDA respawntimer
+  BEQ DrawBall
+  DEC respawntimer
+  JMP DrawPaddles
+
+DrawBall:
   LDA bally  ;;update all ball sprite info
   STA $0200
   
-  LDA #$30
+  LDA #$75   ; 30?
   STA $0201
   
-  LDA #$00
+  LDA #%00000000
   STA $0202
   
   LDA ballx
   STA $0203
   
+DrawPaddles:
   ;;update paddle1 sprites
   LDA paddle1ytop
   STA $0204
@@ -507,9 +548,9 @@ UpdateSprites:
   STA $020D     ; let's do paddle 2's sprite index while A is filled in
   STA $0211
 
-  LDA #%01000000 ; top is flipped horizontally
+  LDA #%01000001 ; top is flipped horizontally
   STA $0206
-  LDA #%11000000 ; bottom is flipped both ways
+  LDA #%11000001 ; bottom is flipped both ways
   STA $020A
 
   LDA #PADDLE1X
@@ -523,9 +564,9 @@ UpdateSprites:
   ADC #$08
   STA $0210
 
-  LDA #%00000000 ; top is not flipped
+  LDA #%00000001 ; top is not flipped
   STA $020E
-  LDA #%10000000 ; bottom is flipped vertically
+  LDA #%10000001 ; bottom is flipped vertically
   STA $0212
 
   LDA #PADDLE2X
@@ -534,14 +575,21 @@ UpdateSprites:
 
   RTS
  
- 
 DrawScore:
-; TODO
-  ;;draw score on screen using background tiles
-  ;;or using many sprites
+  LDA $2002             ; read PPU status to reset the high/low latch
+  LDA #$20
+  STA $2006             ; write the high byte of $2041 address
+  LDA #$41
+  STA $2006             ; write the low byte of $2041 address
+  LDA score1            ; since SMB1's background has the tiles go 0-9, A-Z, score is the tile number
+  STA $2007             ; write out player 1's score
+  LDA #$20
+  STA $2006             ; write thie high byte of $205E address
+  LDA #$5E
+  STA $2006             ; write the low byte of the $205E address
+  LDA score2            
+  STA $2007             ; player 2's score, same as before
   RTS
- 
- 
  
 ReadController1:
   LDA #$01
@@ -576,112 +624,116 @@ ReadController2Loop:
   .segment "SETUP"
   .org $E000
 palette:
-  .b $22,$29,$1A,$0F,  $22,$36,$17,$0F,  $22,$30,$21,$0F,  $22,$27,$17,$0F   ;;background palette
-  .b $22,$1C,$15,$14,  $22,$02,$38,$3C,  $22,$1C,$15,$14,  $22,$02,$38,$3C   ;;sprite palette
+  .b $0F,$29,$1A,$22,  $0F,$36,$17,$15,  $0F,$30,$21,$0F,  $0F,$27,$17,$0F   ;;background palette
+  .b $0F,$1C,$15,$14,  $0F,$02,$38,$3C,  $0F,$1C,$15,$14,  $0F,$02,$38,$3C   ;;sprite palette
+
+;; NOTE - This is wasteful of memory; I could instead do one block for the status bar, then a second block for
+;;        the playfield background which gets written out multiple times; probably could do it as an our loop
+;;        for number of rows, and an inner loop to do 'copy a row'
 
 background:                                                           ;; note - rows are split for readability
-  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 1
-  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all black
+  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 1
+  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all black
 
-  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 2
-  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all black
+  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 2
+  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all black
 
-  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 3
-  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
+  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 3
+  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all black
 
-  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 4
-  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
+  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 4
+  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all black
 
 background2:                                                          ;; since we only have 8 bits for our loop counter split into
                                                                       ;; groups of four rows
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 5
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 5
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 6
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 6
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 7
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 7
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 8
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 8
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
 background3:                                                          ;; since we only have 8 bits for our loop counter split into
                                                                       ;; groups of four rows
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 9
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 9
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 10
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 10
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 11
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 11
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 12
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 12
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
 background4:                                                          ;; since we only have 8 bits for our loop counter split into
                                                                       ;; groups of four rows
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 13
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 13
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 14
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 14
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 15
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 15
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 16
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 16
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
 background5:                                                          ;; since we only have 8 bits for our loop counter split into
                                                                       ;; groups of four rows
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 17
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 17
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 18
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 18
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 19
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 19
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 20
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 20
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
 background6:                                                          ;; since we only have 8 bits for our loop counter split into
                                                                       ;; groups of four rows
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 21
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 21
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 22
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 22
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 23
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 23
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 24
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 24
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
 background7:                                                          ;; since we only have 8 bits for our loop counter split into
                                                                       ;; groups of four rows
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 25
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 25
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 26
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 26
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 27
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 27
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 28
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 28
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;row 29 - the odd row out, we have room in the counter
-  .b $24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24,$24  ;;all sky
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;row 29 - the odd row out, we have room in the counter
+  .b $27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27,$27  ;;all sky
 
 
   attribute:
-  .b %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000 ;; first four rows
+  .b %01010101, %01010101, %01010101, %01010101, %01010101, %01010101, %01010101, %01010101 ;; first four rows
   .b %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000 ;; next four rows
   .b %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000 ;; next four rows
   .b %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000, %00000000 ;; next four rows
