@@ -239,8 +239,6 @@ NMIHandler:
   STA $4014       ; set the high byte (02) of the RAM address, start the transfer
 
   JSR DrawScore    ; need to do this early so we're still in vblank
-                   ; TOdO: this section is all our background code, so we should have
-                   ; DrawTitle, DrawScore, DrawGameOver
 
   ;;This is the PPU clean up section, so rendering the next frame starts properly.
   LDA #%10010000   ; enable NMI, sprites from Pattern Table 0, background from Pattern Table 1
@@ -589,6 +587,40 @@ DrawScore:
   STA $2006             ; write the low byte of the $205E address
   LDA score2            
   STA $2007             ; player 2's score, same as before
+
+CheckEnding:
+  LDA score1
+  CMP #$0F
+  BEQ GameOver
+  LDA score2
+  CMP #$0F
+  BEQ GameOver
+  RTS                   ; Doing this rather than a JMP
+GameOver:
+  LDA #$20
+  STA $2006
+  LDA #$4B
+  STA $2006
+  LDA #$10   ;G
+  STA $2007
+  LDA #$0A   ;A
+  STA $2007
+  LDA #$16   ;M
+  STA $2007
+  LDA #$0E   ;E
+  STA $2007
+  LDA #$24   ;space
+  STA $2007
+  LDA #$18   ;O
+  STA $2007
+  LDA #$1F   ;V
+  STA $2007
+  LDA #$0E   ;E
+  STA $2007
+  LDA #$1B   ;R
+  STA $2007
+  LDA #STATEGAMEOVER
+  STA gamestate
   RTS
  
 ReadController1:
