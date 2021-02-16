@@ -31,7 +31,8 @@ paddlespeed   .ds 1  ; paddle speed per frame
 buttons1      .ds 1  ; player 1 gamepad buttons, one bit per button
 buttons2      .ds 1  ; player 2 gamepad buttons, one bit per button
 respawntimer  .ds 1  ; ticker to decrement until the ball respawns
-binaryScore   .ds 5  ; binary representation of the score
+temporaryScore .ds 2 ; this gets wiped out every time we convert
+binaryScore   .ds 2  ; binary representation of the score
 scoreOnes     .ds 1  ; byte for each digit in the decimal score
 scoreTens     .ds 1
 scoreHundreds .ds 1
@@ -151,6 +152,10 @@ LoadPalettesLoop:
   STA scoreOnes
   STA scoreTens
   STA scoreHundreds
+  STA scoreThousands
+  STA scoreTenThousands
+  STA binaryScore
+  STA binaryScore + 1
 
 
 ;;:Set starting game state
@@ -601,33 +606,50 @@ GameOver:
  
  
 IncrementScore:
-IncOnes:
-  LDA scoreOnes      ; load the lowest digit of the number
-  CLC 
-  ADC #$01           ; add one
+  LDA binaryScore
+  CLC
+  ADC #$01
+  STA binaryScore
+  LDA binaryScore + 1
+  ADC #$00              ; if we carried handle it
+  STA binaryScore + 1
+  
+  LDA binaryScore
+  STA temporaryScore
+  LDA binaryScore + 1
+  STA temporaryScore + 1
+
+BinaryToDecimal:
+  LDA #$00 
   STA scoreOnes
-  CMP #$0A           ; check if it overflowed, now equals 10
-  BNE IncDone        ; if there was no overflow, all done
-IncTens:
-  LDA #$00
-  STA scoreOnes      ; wrap digit to 0
-  LDA scoreTens      ; load the next digit
-  CLC 
-  ADC #$01           ; add one, the carry from previous digit
   STA scoreTens
-  CMP #$0A           ; check if it overflowed, now equals 10
-  BNE IncDone        ; if there was no overflow, all done
-IncHundreds:
-  LDA #$00
-  STA scoreTens      ; wrap digit to 0
-  LDA scoreHundreds  ; load the next digit
-  CLC 
-  ADC #$01           ; add one, the carry from previous digit
   STA scoreHundreds
-IncDone:
+  STA scoreThousands
+  STA scoreTenThousands
+  LDX #$10 
+BitLoop: 
+  ASL temporaryScore 
+  ROL temporaryScore + 1
+  LDY scoreOnes
+  LDA binTable, Y
+  ROL A
+  STA scoreOnes
+  LDY scoreTens
+  LDA binTable, Y
+  ROL A
+  STA scoreTens
+  LDY scoreHundreds
+  LDA binTable, y 
+  ROL A
+  STA scoreHundreds
+  LDY scoreThousands
+  LDA binTable, Y
+  ROL A
+  STA scoreThousands
+  ROL scoreTenThousands
+  DEX
+  BNE BitLoop  
   RTS
-
-
 
  
 ReadController1:
@@ -778,6 +800,9 @@ sprites:
   .b $80, $33, $00, $88   ;sprite 1
   .b $88, $34, $00, $80   ;sprite 2
   .b $88, $35, $00, $88   ;sprite 3
+
+binTable: ; table for the bin to dec conversion
+  .b $00, $01, $02, $03, $04, $80, $81, $82, $83, $84
 
 ;; TODO background shit
 
