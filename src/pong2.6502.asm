@@ -58,7 +58,7 @@ PADDLE2X       = $F0
 
 
 
-.bank 0, 16, $C000, "NES_PRG0" ; these should always be 16kb for PRG, 8kb for CHR
+  .bank 0, 16, $C000, "NES_PRG0" ; these should always be 16kb for PRG, 8kb for CHR
                                  ; in tutorials the number of these should match
                                  ; the number in the inesprg/ineschr directives
   .segment "MAIN_CODE" ; Replaces the bank directive from nesasm format
