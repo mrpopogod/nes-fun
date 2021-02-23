@@ -119,7 +119,7 @@ CopyTiles:
 
   ldy #0       ; starting index into the first page
   sty $2001    ; turn off rendering just in case
-  sty $2006    ; load the destination address into the PPU
+  sty $2006    ; load the destination address into the PPU - Pattern table is at $0000 through $0FFF and $1000 through $1FFF
   sty $2006
   ldx #32      ; number of 256-byte pages to copy
 loop:
