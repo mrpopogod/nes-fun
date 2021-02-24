@@ -137,6 +137,14 @@ NMIHandler:
   STA $2003  ; set the low byte (00) of the RAM address
   LDA #$02
   STA $4014  ; set the high byte (02) of the RAM address, start the DMA transfer
+
+  INX
+  TXA
+  AND #%00001000
+  EOR #%10000000
+  STA $2000             ; swapping the pattern table; since the data of what to render
+                        ; is still good we see it swap between "sprites" and "background" in the mario CHR.
+                        ; 
   
   RTI        ; return from interrupt
 
