@@ -15,6 +15,7 @@ joypad1_pressed .ds 1   ;current frame's off_to_on transitions
 current_note .ds 1      ;used to index into our note_table
 note_value .ds 1        ;there are 12 possible note values. (A-G#, represented by $00-$0B)
 note_octave .ds 1       ;what octave our note is in (1-9)
+triangle_enabled .ds 1  ;are we doing triangle or square?
 sleeping .ds 1          ;main program sets this and waits for the NMI to clear it.  Ensures the main program is run only once per frame.  
                         ;   for more information, see Disch's document: URL HERE
 ptr1 .ds 2              ;a pointer
@@ -92,12 +93,14 @@ clearmem:
     sta $2007
     
 ;Enable sound channels
-    lda #%00000001 
+    lda #%00000101 
     sta $4015 ;enable Square 1
     
     lda #C4
     sta current_note ;start with a middle C
     jsr get_note_and_octave
+    lda #$00
+    sta triangle_enabled ;start with square wave
     
     lda #$88
     sta $2000   ;enable NMIs
@@ -151,9 +154,14 @@ read_joypad:
 ;   right - cycle up a note
 handle_input:
     lda joypad1_pressed
-    and #$0F ;check d-pad only
+    and #$8F ;check d-pad + a only
     beq @done
+@check_a:
+    and #$80 ;a
+    beq @check_up
+    jsr swap_channels
 @check_up:
+    lda joypad1_pressed
     and #$08 ;up
     beq @check_down
     jsr play_note
@@ -174,15 +182,26 @@ handle_input:
     jsr note_up    
 @done:
     rts
+
+;----------------------
+; swap_channels swaps us between square and triangle
+swap_channels:
+    lda triangle_enabled
+    eor #01     ; toggle the bottom bit
+    sta triangle_enabled
+    rts
     
 ;----------------------
 ; play_note plays the note stored in current_note
 play_note:
+    lda triangle_enabled
+    bne @triangle
+@square:
     lda #$7F    ;Duty 01, Volume F
     sta $4000
     lda #$08    ;Set Negate flag so low notes aren't silenced
     sta $4001
-    
+
     lda current_note
     asl a               ;multiply by 2 because we are indexing into a table of words
     tay
@@ -191,12 +210,25 @@ play_note:
     lda note_table+1, y ;read the high byte of the period
     sta $4003           ;write to SQ1_HI
     rts
+@triangle
+    lda #$81            ;disable internal counters, channel on
+    sta $4008
+    
+    lda current_note
+    asl a               ;multiply by 2 because we are indexing into a table of words
+    tay
+    lda note_table, y   ;read the low byte of the period
+    sta $400A           ;write to SQ1_LO
+    lda note_table+1, y ;read the high byte of the period
+    sta $400B           ;write to SQ1_HI
+    rts
     
 ;--------------------
-; silence_note silences the square channel
+; silence_note silences the square and triangle channel
 silence_note:
     lda #$30
     sta $4000   ;silence Square 1 by setting the volume to 0.
+    sta $4008   ;also silence triangle; faster than actually testing which one to hit
     rts
     
 ;--------------------
