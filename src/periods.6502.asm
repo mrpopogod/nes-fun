@@ -314,7 +314,7 @@ draw_note:
     .segment "FIXED_DATA_AND_VECTORS"
     .org $E000
     
-    .include "note_table.asm" ;our NTSC note lookup table
+    .include "note_table.6502.asm" ;our NTSC note lookup table
     
 ;this is a table of pointers.  These pointers point to the beginning of text strings.
 text_pointers:
