@@ -20,13 +20,13 @@ ptr1 .ds 2              ;a pointer
 sound_ptr .ds 2
 current_song .ds 1
 
-    .include "tempo_sound_engine_vars.6502.asm"
+    .include "envelopes_sound_engine_vars.6502.asm"
     
     .bank 0, 16, $8000, "NES_PRG0"
     .segment "SOUND_CODE"
     .org $8000  ;we have two 16k PRG banks now.  We will stick our sound engine in the first one, which starts at $8000.
     
-    .include "tempo_sound_engine.6502.asm"
+    .include "envelopes_sound_engine.6502.asm"
 
     .bank 1, 16, $C000, "NES_PRG1"
     .segment "MAIN_CODE"
@@ -119,6 +119,7 @@ clearmem:
     
     lda #$01
     sta current_song
+    ;jsr sound_load
     
     lda #$88
     sta $2000   ;enable NMIs
@@ -232,6 +233,7 @@ prepare_dbuffer:
     ora stream_status+3
     ora stream_status+4
     ora stream_status+5
+    and #$01
     beq @sound_not_playing  ;if all streams disabled, write "NOT PLAYING" on the screen
     lda sound_disable_flag
     bne @sound_not_playing  ;if the disable flag is set, we want to write "NOT PLAYING" too
@@ -382,19 +384,17 @@ draw_background:
 @done:
     rts
     
-    .org $E000
-
 ;these are our text strings.  They are all terminated by $FF
 
 text_song:
-    .b $22, $1E, $1D, $16, $0D, $FF ;"SONG:"
+    .byte $22, $1E, $1D, $16, $0D, $FF ;"SONG:"
     
 text_sound:
-    .b $22, $1E, $24, $1D, $13, $0D, $FF ;"SOUND:"
+    .byte $22, $1E, $24, $1D, $13, $0D, $FF ;"SOUND:"
 text_not_playing:
-    .b $1D, $1E, $23, $00 ;"NOT "
+    .byte $1D, $1E, $23, $00 ;"NOT "
 text_playing:
-    .b $1F, $1B, $10, $28, $18, $1D, $16, $00, $00, $00, $00, $FF ;"PLAYING    "
+    .byte $1F, $1B, $10, $28, $18, $1D, $16, $00, $00, $00, $00, $FF ;"PLAYING    "
 
     
 ;---- vectors
@@ -408,4 +408,4 @@ text_playing:
     .bank 3, 8, $0000, "NES_CHR0"
     .segment "TILES"
     .org $0000
-    .incbin "tempo.chr"
+    .incbin "envelopes.chr"
