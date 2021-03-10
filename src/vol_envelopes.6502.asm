@@ -4,7 +4,10 @@ volume_envelopes:
     .word se_ve_3
     .word se_ve_tgl_1  ; the guardian legend
     .word se_ve_tgl_2
-    .word se_ve_4
+    .word se_battlekid_loud
+    .word se_battlekid_loud_long
+    .word se_battlekid_soft
+    .word se_battlekid_soft_long
     
 se_ve_1:
     .byte $0F, $0E, $0D, $0C, $09, $05, $00
@@ -27,13 +30,29 @@ se_ve_tgl_2:
     .byte $0B, $0B, $0A, $09, $08, $07, $06, $06, $06, $05
     .byte $FF
     
-se_ve_4:
-    .byte $0F, $0E, $0C, $0A, $09
+    
+se_battlekid_loud:
+    .byte $0f, $0e, $0c, $0a, $00
     .byte $FF
-
+    
+se_battlekid_loud_long:
+    .byte $0f, $0e, $0c, $0a, $09
+    .byte $FF
+    
+se_battlekid_soft:
+    .byte $09, $08, $06, $04, $00
+    .byte $FF
+    
+se_battlekid_soft_long:
+    .byte $09, $08, $06, $04, $03
+    .byte $FF
+    
 ve_short_staccato = $00
 ve_fade_in = $01
 ve_blip_echo = $02
 ve_tgl_1 = $03
 ve_tgl_2 = $04
-ve_loud_long = $05
+ve_battlekid_1 = $05
+ve_battlekid_1b = $06
+ve_battlekid_2 = $07
+ve_battlekid_2b = $08

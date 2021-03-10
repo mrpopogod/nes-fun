@@ -11,19 +11,23 @@ d_quarter = $88
 d_half = $89
 d_whole = $8A   ;don't forget we are counting in hex
 t_quarter = $8B
+five_eighths =$8C
+five_sixteenths=$8D
 
 note_length_table:
-    .b $01   ;32nd note
-    .b $02   ;16th note
-    .b $04   ;8th note
-    .b $08   ;quarter note
-    .b $10   ;half note
-    .b $20   ;whole note
-             ;---dotted notes
-    .b $03   ;dotted 16th note
-    .b $06   ;dotted 8th note
-    .b $0C   ;dotted quarter note
-    .b $18   ;dotted half note
-    .b $30   ;dotted whole note?
-             ;---other
-    .b $07   ;modified quarter to fit after d_sixteenth triplets
+    .byte $01   ;32nd note
+    .byte $02   ;16th note
+    .byte $04   ;8th note
+    .byte $08   ;quarter note
+    .byte $10   ;half note
+    .byte $20   ;whole note
+              ;---dotted notes
+    .byte $03   ;dotted 16th note
+    .byte $06   ;dotted 8th note
+    .byte $0C   ;dotted quarter note
+    .byte $18   ;dotted half note
+    .byte $30   ;dotted whole note?
+              ;---other
+    .byte $07   ;modified quarter to fit after d_sixteenth triplets
+    .byte $14   ;2 quarters plus an 8th
+    .byte $0A
