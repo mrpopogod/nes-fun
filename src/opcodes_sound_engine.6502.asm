@@ -161,7 +161,8 @@ se_fetch_byte:
     bcc @note_length         ;else if < #$A0, it's a Note Length
 @opcode:                     ;else it's an opcode
     ;do Opcode stuff
-    jsr se_opcode_launcher
+    ;jsr se_opcode_launcher
+    jsr se_opcode_rts_launcher
     iny                      ;next position in the data stream
     lda stream_status, x
     and #%00000001
@@ -243,6 +244,21 @@ se_opcode_launcher:
     ldy sound_temp1         ;restore our y register
     iny                     ;set to next position in data stream (assume an argument)
     jmp (jmp_ptr)           ;indirect jump to our opcode subroutine    
+
+; Same as above, but an RTS table implementation
+se_opcode_rts_launcher:
+    stx sound_temp1         ;save x register because we're about to destroy it
+    sec
+    sbc #$A0                ;turn the byte into a table index
+    asl a                   ;multiple by 2 because it's a table of words
+    tax
+    lda sound_opcodes_rts+1, x
+    pha
+    lda sound_opcodes_rts, x
+    pha
+    ldx sound_temp1         ;restore our x register
+    iny                     ;set to next position in data stream (assume an argument)
+    rts                     ;execute the subroutine
     
 ;----------------------------------------------------
 ; se_set_temp_ports will copy a stream's sound data to the temporary apu variables

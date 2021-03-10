@@ -13,6 +13,13 @@ sound_opcodes:
     .word se_op_duty                ;$A3
     ;etc, 1 entry per subroutine
 
+;-----------------------------------------------------------------
+;this is an RTS table
+sound_opcodes_rts:
+    .word se_op_endsound-1
+    .word se_op_infinite_loop-1
+    .word se_op_change_ve-1
+    .word se_op_duty-1
     
 ;-----------------------------------------------------------------
 ; these are the actual opcode subroutines
