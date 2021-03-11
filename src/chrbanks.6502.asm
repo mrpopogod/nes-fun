@@ -164,7 +164,16 @@ ReadStartDone:   ; handling this button is done
  
  
  
- 
+; Ok, this seems like voodoo, but here's what's going on.
+; CNROM (mapper 3) is one of the mappers which suffers bus conflicts.
+; So when you write to the register (which is located in ROM space) it also
+; ends up reading from that ROM location, and one will win.
+; The way you avoid this is to write a value to a location that has that value.
+; So that's what's going on here; the bankswitch register is the entirety of
+; $8000-$FFFF, so if we want to swap to bank 0-3 we need to write to a location
+; in that space which contains that same value.  Hence the lookup table here;
+; if X is 0 then we write to Bankvalues+0 which is $00, so it matches.  Same with
+; X is 1 we write to Bankvalues+1 which is $01, again matching.
 Bankswitch:
   TAX                    ;;copy A into X
   STA Bankvalues, X      ;;new bank to use
