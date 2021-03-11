@@ -1,8 +1,13 @@
 ;these are aliases to use in the sound data.
 endsound = $A0
-song_loop = $A1
+loop = $A1
 volume_envelope = $A2
 duty = $A3
+set_loop1_counter = $A4
+loop1 = $A5
+set_note_offset = $A6
+adjust_note_offset = $A7
+transpose = $A8
 
 ;-----------------------------------------------------------------------
 ;this is our JUMP TABLE!
@@ -11,6 +16,11 @@ sound_opcodes:
     .word se_op_infinite_loop       ;$A1
     .word se_op_change_ve           ;$A2
     .word se_op_duty                ;$A3
+    .word se_op_set_loop1_counter   ;$A4
+    .word se_op_loop1               ;$A5
+    .word se_op_set_note_offset     ;$A6
+    .word se_op_adjust_note_offset  ;$A7
+    .word se_op_transpose           ;$A8
     ;etc, 1 entry per subroutine
 
 ;-----------------------------------------------------------------
@@ -20,6 +30,11 @@ sound_opcodes_rts:
     .word se_op_infinite_loop-1
     .word se_op_change_ve-1
     .word se_op_duty-1
+    .word se_op_set_loop1_counter-1
+    .word se_op_loop1-1
+    .word se_op_set_note_offset-1
+    .word se_op_adjust_note_offset-1
+    .word se_op_transpose-1
     
 ;-----------------------------------------------------------------
 ; these are the actual opcode subroutines
@@ -64,4 +79,52 @@ se_op_change_ve:
 se_op_duty:
     lda (sound_ptr), y
     sta stream_vol_duty, x
+    rts
+    
+se_op_set_loop1_counter:
+    lda (sound_ptr), y      ;read the argument (# times to loop)
+    sta stream_loop1, x     ;store it in the loop counter variable
+    rts
+    
+se_op_loop1:
+    dec stream_loop1, x     ;decrement the counter
+    lda stream_loop1, x
+    beq @last_iteration     ;if zero, we are done looping
+    jmp se_op_infinite_loop ;if not zero, jump back
+@last_iteration:
+    iny                     ;skip the first byte of the address argument
+                            ; the second byte will be skipped automatically upon return
+                            ; (see se_fetch_byte after "jsr se_opcode_launcher")
+    rts
+    
+se_op_set_note_offset:
+    lda (sound_ptr), y          ;read the argument
+    sta stream_note_offset, x      ;set the note offset.
+    rts
+    
+se_op_adjust_note_offset:
+    lda (sound_ptr), y          ;read the argument (what value to add)
+    clc
+    adc stream_note_offset, x   ;add it to the current offset
+    sta stream_note_offset, x   ;and save.
+    rts
+    
+se_op_transpose:
+    lda (sound_ptr), y          ;read low byte of the pointer to our lookup table
+    sta sound_ptr2              ;store it in a new pointer variable
+    iny
+    lda (sound_ptr), y          ;read high byte of pointer to table
+    sta sound_ptr2+1
+    
+    sty sound_temp1             ;save y because we are about to destroy it
+    lda stream_loop1, x         ;get loop counter, put it in Y
+    tay                         ;   this will be our index into the lookup table
+    dey                         ;subtract 1 because indexes start from 0.
+    
+    lda (sound_ptr2), y         ;read a value from the table.
+    clc
+    adc stream_note_offset, x   ;add it to the note offset
+    sta stream_note_offset, x
+    
+    ldy sound_temp1             ;restore Y
     rts

@@ -2,7 +2,7 @@ volume_envelopes:
     .word se_ve_1
     .word se_ve_2
     .word se_ve_3
-    .word se_ve_tgl_1  ; the guardian legend
+    .word se_ve_tgl_1
     .word se_ve_tgl_2
     .word se_battlekid_loud
     .word se_battlekid_loud_long
