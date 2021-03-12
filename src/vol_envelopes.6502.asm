@@ -8,6 +8,7 @@ volume_envelopes:
     .word se_battlekid_loud_long
     .word se_battlekid_soft
     .word se_battlekid_soft_long
+    .word se_drum_decay
     
 se_ve_1:
     .byte $0F, $0E, $0D, $0C, $09, $05, $00
@@ -47,6 +48,10 @@ se_battlekid_soft_long:
     .byte $09, $08, $06, $04, $03
     .byte $FF
     
+se_drum_decay:
+    .byte $0E, $09, $08, $06, $04, $03, $02, $01, $00
+    .byte $FF
+    
 ve_short_staccato = $00
 ve_fade_in = $01
 ve_blip_echo = $02
@@ -56,3 +61,4 @@ ve_battlekid_1 = $05
 ve_battlekid_1b = $06
 ve_battlekid_2 = $07
 ve_battlekid_2b = $08
+ve_drum_decay = $09
